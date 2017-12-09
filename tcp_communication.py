@@ -6,7 +6,8 @@ import os
 import socket
 import sys
 
-GAME_HOST = "192.168.0.3"
+GAME_HOST = input("Game Host IP: ")
+print("game host ip is {}".format(GAME_HOST))
 GAME_PORT = 5566
 game_socket = None
 
