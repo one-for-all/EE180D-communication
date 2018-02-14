@@ -41,11 +41,32 @@ def send_to_game(command):
         game_socket.sendall(command.encode())
     except (BrokenPipeError, AttributeError) as e:
         if establish_socket():
-            game_socket.sendall(command.encode())
+            send_command = command
+            game_socket.sendall(send_command.encode())
+            print("sending: " + send_command)
+
+loop = asyncio.get_event_loop()
+
+print("Setting up remote server for receiving message from game")
+MY_REMOTE_IP = os.popen('configure_edison --showWiFiIP').read()[:-1]
+MY_REMOTE_PORT = GAME_PORT+1
+async def remote_socket(reader, writer):
+    message = await reader.read()
+    message = message.decode()
+    print("message: {}".format(message))
+    in_battle_header = "in battle: "
+    if message.startswith(in_battle_header):
+        in_battle = int(message[len(in_battle_header):])
+    writer.close()
+
+remote_server_coroutine = asyncio.start_server(remote_socket, MY_REMOTE_IP,
+                                               MY_REMOTE_PORT, loop=loop)
+remote_server = loop.run_until_complete(remote_server_coroutine)
+print("Waiting on {}".format(remote_server.sockets[0].getsockname()))
+
 
 # Set up local server for receiving inputs from other processes
-loop = asyncio.get_event_loop()
-HOST = ''     # Symbolic name meaning all available interfaces
+HOST = '127.0.0.1'    # Symbolic name meaning all available interfaces
 PORT = 6666   # Arbitrary non-privileged port
 print("Setting up local server for receiving inputs from other "
       "local processes")
@@ -53,7 +74,6 @@ async def local_socket(reader, writer):
     message = await reader.read()
     message = message.decode()
     addr = writer.get_extra_info('peername')
-    print("Received {}".format(message))
     if message != "":
         send_to_game(message)
     writer.close()
@@ -62,6 +82,7 @@ local_server_coroutine = asyncio.start_server(local_socket, HOST, PORT,
                                             loop=loop)
 local_server = loop.run_until_complete(local_server_coroutine)
 print('Serving on {}'.format(local_server.sockets[0].getsockname()))
+
 
 
 try:
